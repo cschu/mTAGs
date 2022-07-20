@@ -365,11 +365,11 @@ def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, rea
     # Create forward fasta file in workdir
     fasta_forward = output_folder.joinpath(f'{samplename}_fw.fasta')
     fasta_reverse = output_folder.joinpath(f'{samplename}_rev.fasta')
-    fasta_map = output_folder.joinpath(f'{samplename}_read.map')
+    fasta_map = output_folder.joinpath(f'{samplename}_read.map.gz')
     tmp_files.append(fasta_forward)
     tmp_files.append(fasta_reverse)
     number_of_input_sequences = 0
-    fasta_map_file = open(fasta_map, 'w')
+    fasta_map_file = gzip.open(fasta_map, 'wt')
     fw_handle = open(fasta_forward, 'w')
     rev_handle = open(fasta_reverse, 'w')
     with fasta_map_file, fw_handle, rev_handle:
