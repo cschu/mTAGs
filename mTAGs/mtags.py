@@ -358,6 +358,7 @@ def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, rea
     """
 
     tmp_files = [] # to be deleted at the end of the program
+    read_order = []
 
 
     logging.info(f'Extracting FastA and revcomp FastA from {input_seq_file}')
@@ -376,7 +377,8 @@ def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, rea
         for number_of_sequences, fasta in enumerate(stream_fa(input_seq_file), 1):
             if number_of_sequences % 1000000 == 0:
                 logging.info(f'Processed reads:\t{number_of_sequences}')
-            header = fasta.header.split()[0][1:]  # re.sub('\s+', '_', fasta.header)
+            header = fasta.header.split()[0]  # re.sub('\s+', '_', fasta.header)
+            read_order.append(fasta.header)
             fasta_map_file.write(f'{header}\t{readnames}.{number_of_sequences}\n')
             fw_handle.write(f'>{readnames}.{number_of_sequences}\n{fasta.sequence}\n')
             rev_handle.write(f'>{readnames}.{number_of_sequences}\n{revcomp(fasta.sequence)}\n')
@@ -435,29 +437,35 @@ def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, rea
     lsu_files = []
     stats = collections.Counter()
     fasta_iterator = stream_fa(str(fasta_forward))
-    for number_of_sequences, fasta in enumerate(fasta_iterator, 1):
-        if number_of_sequences % 1000000 == 0:
-            logging.info(f'Processed reads:\t{number_of_sequences}')
-        header = re.sub('\s+', '_', fasta.header)
-        best_assignment = read_2_bestassignment.get(header, None)
 
-        if best_assignment:
-            stats[best_assignment[0]] += 1
-            writer = writers.get(best_assignment[0], None)
-            if not writer:
-                o_file = output_folder.joinpath(f'{samplename}_{best_assignment[0]}.fasta')
-                if str(o_file).endswith('ssu.fasta'):
-                    ssu_files.append(o_file)
-                elif str(o_file).endswith('lsu.fasta'):
-                    lsu_files.append(o_file)
-                else:
-                    logging.error(f'Unkown output file:\t{o_file}')
-                    shutdown(1)
+    # read_order = {read_index: r for read_index, r in enumerate(read_order, start=1)}
 
-                writer = open(o_file, 'w')
-                writers[best_assignment[0]] = writer
-            writer.write(f'>{header}\n{fasta.sequence}\n')
-    logging.info(f'Processed reads:\t{number_of_sequences}')
+    with gzip.open(fasta_map.replace(".gz", ".extracted.gz"), "wt") as ext_fmap_out:
+
+        for number_of_sequences, fasta in enumerate(fasta_iterator, 1):
+            if number_of_sequences % 1000000 == 0:
+                logging.info(f'Processed reads:\t{number_of_sequences}')
+            header = re.sub('\s+', '_', fasta.header)
+            best_assignment = read_2_bestassignment.get(header, None)
+
+            if best_assignment:
+                stats[best_assignment[0]] += 1
+                writer = writers.get(best_assignment[0], None)
+                if not writer:
+                    o_file = output_folder.joinpath(f'{samplename}_{best_assignment[0]}.fasta')
+                    if str(o_file).endswith('ssu.fasta'):
+                        ssu_files.append(o_file)
+                    elif str(o_file).endswith('lsu.fasta'):
+                        lsu_files.append(o_file)
+                    else:
+                        logging.error(f'Unkown output file:\t{o_file}')
+                        shutdown(1)
+
+                    writer = open(o_file, 'w')
+                    writers[best_assignment[0]] = writer
+                writer.write(f'>{header}\n{fasta.sequence}\n')
+                ext_fmap_out.write(f'{read_order[number_of_sequences - 1]}\t{fasta.header}\n')
+        logging.info(f'Processed reads:\t{number_of_sequences}')
     for writer in writers.values():
         writer.close()
     logging.info(f'Finished extracting reads/writing output')
