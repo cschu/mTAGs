@@ -380,8 +380,10 @@ def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, rea
             header = fasta.header.split()[0]  # re.sub('\s+', '_', fasta.header)
             read_order.append(fasta.header)
             fasta_map_file.write(f'{header}\t{readnames}.{number_of_sequences}\n')
-            fw_handle.write(f'>{readnames}.{number_of_sequences}\n{fasta.sequence}\n')
-            rev_handle.write(f'>{readnames}.{number_of_sequences}\n{revcomp(fasta.sequence)}\n')
+            # fw_handle.write(f'>{readnames}.{number_of_sequences}\n{fasta.sequence}\n')
+            # rev_handle.write(f'>{readnames}.{number_of_sequences}\n{revcomp(fasta.sequence)}\n')
+            fw_handle.write(f'>{header}\n{fasta.sequence}\n')
+            rev_handle.write(f'>{header}\n{revcomp(fasta.sequence)}\n')
     logging.info(f'Processed reads:\t{number_of_sequences}')
     logging.info(f'Finished extracting. Found {number_of_sequences} sequences.')
     
