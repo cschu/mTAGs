@@ -440,7 +440,7 @@ def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, rea
 
     # read_order = {read_index: r for read_index, r in enumerate(read_order, start=1)}
 
-    with gzip.open(fasta_map.replace(".gz", ".extracted.gz"), "wt") as ext_fmap_out:
+    with gzip.open(output_folder.joinpath(f'{samplename}_read.map.extracted.gz'), "wt") as ext_fmap_out:
 
         for number_of_sequences, fasta in enumerate(fasta_iterator, 1):
             if number_of_sequences % 1000000 == 0:
