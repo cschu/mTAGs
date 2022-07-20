@@ -7,7 +7,7 @@ install_requires = ['biopython']
 long_description = read('README.md')
 setup(
     name = "mTAGs",
-    version = "1.0.4",
+    version = "1.1_cs",
     author = "Hans-Joachim Ruscheweyh",
     author_email = "hansr@ethz.ch",
     description = ("mTAGs - taxonomic profiling using degenerate consensus reference sequences of ribosomal RNA gene."),
