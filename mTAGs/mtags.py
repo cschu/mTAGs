@@ -586,6 +586,7 @@ Output options:
 
 Other options:
     -t  INT               Number of threads. [4]
+    -k, --keep-readnames  Keep input readnames instead of using random identifiers. [false]
             ''', formatter_class=CapitalisedHelpFormatter, add_help=False)
 
     parser.add_argument('-f', action='store', nargs='+', dest='i1', help='Input forward reads files. Can be fasta/fastq and gzipped. The order of the files has to match the order in -i2. Read pairs in files are identified by the identical name in -i2.')
@@ -1176,6 +1177,7 @@ Other options:
                           numbers increase sensitivity and runtime. [1000]
     -mr INT               Maxrejects, vsearch parameter. Larger 
                           numbers increase sensitivity and runtime. [1000]
+    -k, --keep-readnames  Keep input readnames instead of using random identifiers. [false]
         ''', formatter_class=CapitalisedHelpFormatter, add_help=False)
 
 
