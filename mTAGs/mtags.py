@@ -621,7 +621,7 @@ Other options:
     threads = results.threads
 
 
-    ssu_files = _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads, keep_readnames=args.keep_readnames)
+    ssu_files = _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads, keep_readnames=results.keep_readnames)
 
 
 
@@ -1231,7 +1231,7 @@ Other options:
         logging.error(f'The output pattern cannot be a directory.')
         shutdown(1)
 
-    ssu_files = _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads, keep_readnames=args.keep_readnames)
+    ssu_files = _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads, keep_readnames=results.keep_readnames)
 
 
     database, taxmap = get_database()
