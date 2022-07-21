@@ -350,7 +350,7 @@ def check_call(command: str):
 
 
 
-def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, readnames, threads: int = 1):
+def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, readnames: str = None, threads: int = 1):
     """Top level function that takes a fasta/fastq file
     and searches for reads that potentially come from
     rRNA genes.
@@ -359,7 +359,6 @@ def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, rea
 
     tmp_files = [] # to be deleted at the end of the program
     read_order = []
-
 
     logging.info(f'Extracting FastA and revcomp FastA from {input_seq_file}')
     samplename = input_seq_file.name
@@ -370,20 +369,25 @@ def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, rea
     tmp_files.append(fasta_forward)
     tmp_files.append(fasta_reverse)
     number_of_input_sequences = 0
-    fasta_map_file = gzip.open(fasta_map, 'wt')
+    # fasta_map_file = gzip.open(fasta_map, 'wt')
     fw_handle = open(fasta_forward, 'w')
     rev_handle = open(fasta_reverse, 'w')
-    with fasta_map_file, fw_handle, rev_handle:
+    with fw_handle, rev_handle:
         for number_of_sequences, fasta in enumerate(stream_fa(input_seq_file), 1):
             if number_of_sequences % 1000000 == 0:
                 logging.info(f'Processed reads:\t{number_of_sequences}')
-            header = fasta.header.split()[0]  # re.sub('\s+', '_', fasta.header)
-            read_order.append(fasta.header)
-            fasta_map_file.write(f'{header}\t{readnames}.{number_of_sequences}\n')
-            # fw_handle.write(f'>{readnames}.{number_of_sequences}\n{fasta.sequence}\n')
-            # rev_handle.write(f'>{readnames}.{number_of_sequences}\n{revcomp(fasta.sequence)}\n')
-            fw_handle.write(f'>{header}\n{fasta.sequence}\n')
-            rev_handle.write(f'>{header}\n{revcomp(fasta.sequence)}\n')
+
+            if readnames:
+                out_header = f'{readnames}.{number_of_sequences}'
+            else:
+                header = fasta.header.split()[0]  # re.sub('\s+', '_', fasta.header)
+                # fasta_map_file.write(f'{header}\t{readnames}.{number_of_sequences}\n')
+                read_order.append(fasta.header)
+                out_header = fasta.header
+
+            fw_handle.write(f'>{out_header}\n{fasta.sequence}\n')
+            rev_handle.write(f'>{out_header}\n{revcomp(fasta.sequence)}\n')
+
     logging.info(f'Processed reads:\t{number_of_sequences}')
     logging.info(f'Finished extracting. Found {number_of_sequences} sequences.')
     
@@ -440,33 +444,29 @@ def mtags_extract(input_seq_file: pathlib.Path, output_folder: pathlib.Path, rea
     stats = collections.Counter()
     fasta_iterator = stream_fa(str(fasta_forward))
 
-    # read_order = {read_index: r for read_index, r in enumerate(read_order, start=1)}
+    for number_of_sequences, fasta in enumerate(fasta_iterator, 1):
+        if number_of_sequences % 1000000 == 0:
+            logging.info(f'Processed reads:\t{number_of_sequences}')
+        header = re.sub('\s+', '_', fasta.header)
+        best_assignment = read_2_bestassignment.get(header, None)
 
-    with gzip.open(output_folder.joinpath(f'{samplename}_read.map.extracted.gz'), "wt") as ext_fmap_out:
+        if best_assignment:
+            stats[best_assignment[0]] += 1
+            writer = writers.get(best_assignment[0], None)
+            if not writer:
+                o_file = output_folder.joinpath(f'{samplename}_{best_assignment[0]}.fasta')
+                if str(o_file).endswith('ssu.fasta'):
+                    ssu_files.append(o_file)
+                elif str(o_file).endswith('lsu.fasta'):
+                    lsu_files.append(o_file)
+                else:
+                    logging.error(f'Unknown output file:\t{o_file}')
+                    shutdown(1)
 
-        for number_of_sequences, fasta in enumerate(fasta_iterator, 1):
-            if number_of_sequences % 1000000 == 0:
-                logging.info(f'Processed reads:\t{number_of_sequences}')
-            header = re.sub('\s+', '_', fasta.header)
-            best_assignment = read_2_bestassignment.get(header, None)
+                writer = open(o_file, 'w')
+                writers[best_assignment[0]] = writer
+            writer.write(f'>{header}\n{fasta.sequence}\n')
 
-            if best_assignment:
-                stats[best_assignment[0]] += 1
-                writer = writers.get(best_assignment[0], None)
-                if not writer:
-                    o_file = output_folder.joinpath(f'{samplename}_{best_assignment[0]}.fasta')
-                    if str(o_file).endswith('ssu.fasta'):
-                        ssu_files.append(o_file)
-                    elif str(o_file).endswith('lsu.fasta'):
-                        lsu_files.append(o_file)
-                    else:
-                        logging.error(f'Unkown output file:\t{o_file}')
-                        shutdown(1)
-
-                    writer = open(o_file, 'w')
-                    writers[best_assignment[0]] = writer
-                writer.write(f'>{header}\n{fasta.sequence}\n')
-                ext_fmap_out.write(f'{read_order[number_of_sequences - 1]}\t{fasta.header}\n')
         logging.info(f'Processed reads:\t{number_of_sequences}')
     for writer in writers.values():
         writer.close()
@@ -501,7 +501,7 @@ def generate_random_sample_name():
     return result_str
 
 
-def _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads):
+def _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads, keep_readnames=False):
     """Helper function to run mTAG extract
 
     """
@@ -534,7 +534,7 @@ def _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_
     all_ssu_files_r2 = []
     all_ssu_files_s = []
     for input_seqfile_r1, input_seqfile_r2 in zip(input_seqfiles_r1, input_seqfiles_r2):
-        readnames = generate_random_sample_name()
+        readnames = None if keep_readnames else generate_random_sample_name()
         (reads_r1, ssu_files_r1, lsu_file_r1) = mtags_extract(pathlib.Path(input_seqfile_r1), output_folder, readnames, threads=threads)
         (reads_r2, ssu_files_r2, lsu_file_r2) = mtags_extract(pathlib.Path(input_seqfile_r2), output_folder, readnames, threads=threads)
         all_ssu_files_r1 = all_ssu_files_r1 + ssu_files_r1
@@ -543,7 +543,7 @@ def _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_
             logging.error(f'R1 and R2 files have different number of reads. Files are potentially corrupt. Quitting')
             shutdown(1)
     for input_seqfile_s in input_seqfiles_s:
-        readnames = generate_random_sample_name()
+        readnames = None if keep_readnames else generate_random_sample_name()
         (reads_s, ssu_files_s, lsu_file_s) = mtags_extract(pathlib.Path(input_seqfile_s), output_folder, readnames, threads=threads)
         all_ssu_files_s = all_ssu_files_s + ssu_files_s
     return (all_ssu_files_r1, all_ssu_files_r2, all_ssu_files_s)
@@ -594,6 +594,7 @@ Other options:
     parser.add_argument('-o', action='store', dest='output',help='Output folder.', required=True)
     parser.add_argument('-t', action='store', dest='threads', help='Number of threads for hmmsearch.',
                         default=4, type=int)
+    parser.add_argument('--keep-readnames', '-k', action='store_true', help='Keep original input read names.')
 
     if len(args) == 0:
         parser.print_usage()
@@ -619,7 +620,7 @@ Other options:
     threads = results.threads
 
 
-    ssu_files = _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads)
+    ssu_files = _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads, keep_readnames=args.keep_readnames)
 
 
 
@@ -1188,6 +1189,7 @@ Other options:
     parser.add_argument('-t', action='store', dest='threads', help='Number of threads.', default=4, type=int)
     parser.add_argument('-ma', action='store', dest='ma', help='Maxaccepts, vsearch parameter. Larger numbers increase sensitivity and runtime. default=1000', default=1000, type=int)
     parser.add_argument('-mr', action='store', dest='mr', help='Maxrejects, vsearch parameter. Larger numbers increase sensitivity and runtime. default=1000', default=1000, type=int)
+    parser.add_argument('--keep-readnames', '-k', action='store_true', help='Keep original input read names.')
 
 
     if len(args) == 0:
@@ -1227,7 +1229,7 @@ Other options:
         logging.error(f'The output pattern cannot be a directory.')
         shutdown(1)
 
-    ssu_files = _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads)
+    ssu_files = _mtags_extract_grouped(input_seqfiles_r1, input_seqfiles_r2, input_seqfiles_s, output_folder, threads, keep_readnames=args.keep_readnames)
 
 
     database, taxmap = get_database()
